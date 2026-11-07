@@ -4,22 +4,9 @@ A hands-on Red Hat OpenShift AI demo built around an industrial story: **detect 
 
 It follows the same steps as Red Hat's official fraud-detection tutorial (project, connections, workbench, train, ONNX, serve, pipeline), with an industrial model and an edge extension.
 
-```mermaid
-flowchart LR
-  subgraph OAI["OpenShift AI (cloud or data center)"]
-    WB["Workbench notebooks<br/>explore, train"] --> S3[("S3: models/bearing/N/model.onnx")]
-    PL["Data Science Pipeline<br/>data, train, gate, ONNX, publish"] --> S3
-    S3 --> REG["Model Registry"]
-    S3 --> SRV["KServe + OpenVINO Model Server<br/>/v2/models/bearing/infer"]
-  end
-  S3 -. "model image (modelcar), GitOps" .-> OVMS
-  subgraph EDGE["Mill edge (MicroShift or Podman)"]
-    SIM["Planer simulator<br/>vibration over MQTT"] --> MQ(("MQTT"))
-    MQ --> SC["Scorer: same feature code,<br/>debounce, rule fallback"]
-    SC --> OVMS["OpenVINO Model Server"]
-    SC --> AL["mill/alerts/planer-3"]
-  end
-```
+![Architecture: OpenShift AI trains and serves the model; the mill edge scores it locally](docs/architecture.png)
+
+Source: [`docs/architecture.drawio`](docs/architecture.drawio) (open in [draw.io](https://app.diagrams.net) to edit, then re-export `docs/architecture.png`).
 
 ## What you will learn
 
@@ -50,6 +37,7 @@ pipelines/              KFP v2 pipeline + compiled YAML
 openshift-ai/           demo S3 (MinIO) + connections, ServingRuntime + InferenceService
 edge/                   compose.yaml (laptop), microshift/ (kustomize), model image Containerfile
 tests/                  unit tests
+docs/                   architecture diagram (draw.io source + PNG)
 ```
 
 ## Path A: laptop in 10 minutes (no cluster)

@@ -1,0 +1,84 @@
+<mxfile host="drawio" version="24.7.17">
+  <diagram id="architecture" name="Architecture">
+    <mxGraphModel dx="1000" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="680" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- OpenShift AI -->
+        <mxCell id="oai" value="OpenShift AI (cloud or data center)" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#fdecea;strokeColor=#cc0000;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontStyle=1;fontSize=14;container=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="840" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="wb" value="Workbench notebooks&lt;br&gt;explore, train" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="oai">
+          <mxGeometry x="30" y="60" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pl" value="Data Science Pipeline&lt;br&gt;data, train, gate, ONNX, publish" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="oai">
+          <mxGeometry x="30" y="190" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="S3&lt;br&gt;models/bearing/N/model.onnx" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="oai">
+          <mxGeometry x="300" y="110" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="reg" value="Model Registry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="oai">
+          <mxGeometry x="580" y="50" width="230" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="srv" value="KServe + OpenVINO Model Server&lt;br&gt;/v2/models/bearing/infer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="oai">
+          <mxGeometry x="580" y="190" width="230" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e-wb-s3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="oai" source="wb" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-pl-s3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="oai" source="pl" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-s3-reg" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="oai" source="s3" target="reg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-s3-srv" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="oai" source="s3" target="srv">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Mill edge -->
+        <mxCell id="edge" value="Mill edge (MicroShift or Podman)" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#eef5e9;strokeColor=#3f7f2f;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontStyle=1;fontSize=14;container=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="400" width="840" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="sim" value="Planer simulator&lt;br&gt;vibration over MQTT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="edge">
+          <mxGeometry x="30" y="90" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="mq" value="MQTT" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="edge">
+          <mxGeometry x="240" y="80" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sc" value="Scorer: same feature code,&lt;br&gt;debounce, rule fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="edge">
+          <mxGeometry x="360" y="90" width="190" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ovms" value="OpenVINO Model Server" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="edge">
+          <mxGeometry x="610" y="50" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="al" value="mill/alerts/planer-3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;" vertex="1" parent="edge">
+          <mxGeometry x="610" y="160" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e-sim-mq" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="edge" source="sim" target="mq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-mq-sc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="edge" source="mq" target="sc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-sc-ovms" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;" edge="1" parent="edge" source="sc" target="ovms">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-sc-al" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;" edge="1" parent="edge" source="sc" target="al">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Cross-boundary: model delivery to the edge -->
+        <mxCell id="e-s3-ovms" value="model image (modelcar), GitOps" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=open;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="s3" target="ovms">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="420" y="360" />
+              <mxPoint x="730" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
