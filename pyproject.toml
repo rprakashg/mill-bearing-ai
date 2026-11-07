@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mill-bearing-ai"
+version = "0.1.0"
+description = "Mill bearing failure prediction: OpenShift AI demo from notebook to edge"
+requires-python = ">=3.9"
+dependencies = [
+  "numpy>=1.24",
+  "scikit-learn>=1.3",
+  "onnx>=1.15",
+  "onnxruntime>=1.17",
+  "paho-mqtt>=2.0",
+  "boto3>=1.28",
+]
+
+[project.optional-dependencies]
+notebook = ["matplotlib>=3.7", "pandas>=2.0"]
+registry = ["model-registry"]
+pipeline = ["kfp>=2.9", "kfp-kubernetes>=1.3"]
+dev = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

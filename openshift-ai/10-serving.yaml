@@ -1,0 +1,56 @@
+# Model serving on OpenShift AI with KServe (RawDeployment) and OpenVINO Model Server.
+#
+# Easiest path: in the dashboard, Models > Deploy model, choose the "OpenVINO Model Server" runtime,
+# model framework "onnx - 1", connection "My Storage", path "models/bearing/". This file is the YAML
+# equivalent for GitOps. Prefer the OVMS runtime template that ships with your OpenShift AI version;
+# the ServingRuntime below is a fallback if that template is not enabled.
+#   oc apply -f openshift-ai/10-serving.yaml
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: bearing-ovms
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    openshift.io/display-name: OpenVINO Model Server (bearing demo)
+spec:
+  multiModel: false
+  protocolVersions: [v2, grpc-v2]
+  supportedModelFormats:
+    - { name: onnx, version: "1", autoSelect: true }
+  containers:
+    - name: kserve-container
+      image: docker.io/openvino/model_server:2024.5
+      args:
+        - --model_name={{.Name}}
+        - --port=8001
+        - --rest_port=8888
+        - --model_path=/mnt/models
+        - --file_system_poll_wait_seconds=0
+        - --grpc_bind_address=0.0.0.0
+        - --rest_bind_address=0.0.0.0
+      ports:
+        - { containerPort: 8888, protocol: TCP }
+      resources:
+        requests: { cpu: 500m, memory: 512Mi }
+        limits: { cpu: "1", memory: 1Gi }
+---
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: bearing
+  labels:
+    opendatahub.io/dashboard: "true"
+    networking.kserve.io/visibility: exposed   # creates an external route for the demo
+  annotations:
+    openshift.io/display-name: Bearing fault classifier
+    serving.kserve.io/deploymentMode: RawDeployment
+spec:
+  predictor:
+    minReplicas: 1
+    model:
+      runtime: bearing-ovms
+      modelFormat: { name: onnx, version: "1" }
+      storage:
+        key: aws-connection-my-storage   # the "My Storage" connection
+        path: models/bearing/            # contains 1/, 2/, ...; OVMS loads the newest version at startup

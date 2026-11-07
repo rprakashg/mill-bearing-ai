@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - mill-edge.yaml
+# Point these at your registry. Rolling out a new model = bump MODEL_IMAGE's tag in Git;
+# OpenShift GitOps / Red Hat Edge Manager applies it to every mill.
+images:
+  - name: APP_IMAGE
+    newName: quay.io/YOUR_ORG/mill-bearing-ai
+    newTag: "0.1.0"
+  - name: MODEL_IMAGE
+    newName: quay.io/YOUR_ORG/bearing-model
+    newTag: "1"

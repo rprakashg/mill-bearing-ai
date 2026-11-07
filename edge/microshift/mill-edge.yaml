@@ -1,0 +1,132 @@
+# Mill edge on MicroShift (or any Kubernetes): broker, model server, scorer, simulator.
+# Images: build/push ${APP_IMAGE} from the repo Containerfile and ${MODEL_IMAGE} from edge/Containerfile.model,
+# then: oc apply -k edge/microshift   (edit the images in kustomization.yaml first)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mill-edge
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mosquitto-config
+  namespace: mill-edge
+data:
+  mosquitto.conf: |
+    listener 1883
+    allow_anonymous true
+    persistence false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mqtt
+  namespace: mill-edge
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: mqtt } }
+  template:
+    metadata: { labels: { app: mqtt } }
+    spec:
+      containers:
+        - name: mosquitto
+          image: docker.io/library/eclipse-mosquitto:2
+          ports: [{ containerPort: 1883 }]
+          volumeMounts: [{ name: config, mountPath: /mosquitto/config }]
+          resources: { requests: { cpu: 50m, memory: 32Mi } }
+      volumes:
+        - name: config
+          configMap: { name: mosquitto-config }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mqtt
+  namespace: mill-edge
+spec:
+  selector: { app: mqtt }
+  ports: [{ port: 1883, targetPort: 1883 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ovms
+  namespace: mill-edge
+  labels: { app: ovms, model-version: "1" }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: ovms } }
+  template:
+    metadata: { labels: { app: ovms } }
+    spec:
+      initContainers:
+        # Copy the model out of the signed model image ("modelcar") into a shared volume.
+        - name: model
+          image: MODEL_IMAGE
+          command: ["cp", "-r", "/models/bearing", "/shared/"]
+          volumeMounts: [{ name: models, mountPath: /shared }]
+      containers:
+        - name: ovms
+          image: docker.io/openvino/model_server:2024.5
+          args: ["--model_name", "bearing", "--model_path", "/models/bearing", "--port", "9000", "--rest_port", "8000"]
+          ports: [{ containerPort: 8000 }]
+          readinessProbe:
+            httpGet: { path: /v2/models/bearing/ready, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts: [{ name: models, mountPath: /models }]
+          resources: { requests: { cpu: 250m, memory: 256Mi } }
+      volumes:
+        - name: models
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ovms
+  namespace: mill-edge
+spec:
+  selector: { app: ovms }
+  ports: [{ port: 8000, targetPort: 8000 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scorer
+  namespace: mill-edge
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: scorer } }
+  template:
+    metadata: { labels: { app: scorer } }
+    spec:
+      containers:
+        - name: scorer
+          image: APP_IMAGE
+          command: ["python", "-m", "bearing.edge.scorer"]
+          env:
+            - { name: MQTT_HOST, value: mqtt }
+            - { name: MODEL_URL, value: "http://ovms:8000" }
+            - { name: ALERT_THRESHOLD, value: "0.7" }
+            - { name: ALERT_CONSECUTIVE, value: "3" }
+          resources: { requests: { cpu: 100m, memory: 128Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simulator
+  namespace: mill-edge
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: simulator } }
+  template:
+    metadata: { labels: { app: simulator } }
+    spec:
+      containers:
+        - name: simulator
+          image: APP_IMAGE
+          command: ["python", "-m", "bearing.edge.simulator"]
+          env:
+            - { name: MQTT_HOST, value: mqtt }
+            - { name: ASSET_ID, value: planer-3 }
+          resources: { requests: { cpu: 100m, memory: 128Mi } }

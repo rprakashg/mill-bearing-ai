@@ -1,0 +1,39 @@
+# Laptop "mill edge": podman compose -f edge/compose.yaml up --build   (run from the repo root, after `make train`)
+# Same model, same OVMS server, same KServe v2 API as the OpenShift AI deployment.
+name: mill-edge
+
+services:
+  mqtt:
+    image: docker.io/library/eclipse-mosquitto:2
+    ports: ["1883:1883"]
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro,Z
+
+  ovms:
+    container_name: mill-edge-ovms
+    image: docker.io/openvino/model_server:2024.5
+    command: ["--model_name", "bearing", "--model_path", "/models/bearing", "--port", "9000", "--rest_port", "8000"]
+    ports: ["8000:8000"]
+    volumes:
+      - ../models:/models:ro,Z
+
+  scorer:
+    container_name: mill-edge-scorer
+    build: { context: .., dockerfile: Containerfile }
+    image: localhost/mill-bearing-ai:latest
+    command: ["python", "-m", "bearing.edge.scorer"]
+    environment:
+      MQTT_HOST: mqtt
+      MODEL_URL: http://ovms:8000
+      ALERT_THRESHOLD: "0.7"
+      ALERT_CONSECUTIVE: "3"
+    depends_on: [mqtt, ovms]
+
+  simulator:
+    build: { context: .., dockerfile: Containerfile }
+    image: localhost/mill-bearing-ai:latest
+    command: ["python", "-m", "bearing.edge.simulator"]
+    environment:
+      MQTT_HOST: mqtt
+      ASSET_ID: planer-3
+    depends_on: [mqtt, scorer]

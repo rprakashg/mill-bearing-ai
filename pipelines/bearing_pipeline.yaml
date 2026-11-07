@@ -1,0 +1,398 @@
+# PIPELINE DEFINITION
+# Name: mill-bearing-training
+# Description: Train, gate, export and publish the planer bearing fault classifier
+# Inputs:
+#    min_macro_f1: float [Default: 0.9]
+#    model_version: str [Default: '2']
+#    n_per_class: int [Default: 600.0]
+#    register_model: bool [Default: False]
+#    seed: int [Default: 11.0]
+components:
+  comp-condition-1:
+    dag:
+      tasks:
+        export-onnx-model:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-export-onnx-model
+          inputs:
+            artifacts:
+              dataset:
+                componentInputArtifact: pipelinechannel--generate-data-dataset
+              model:
+                componentInputArtifact: pipelinechannel--train-model-model
+          taskInfo:
+            name: export-onnx-model
+        publish-model:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-publish-model
+          dependentTasks:
+          - export-onnx-model
+          inputs:
+            artifacts:
+              onnx_model:
+                taskOutputArtifact:
+                  outputArtifactKey: onnx_model
+                  producerTask: export-onnx-model
+            parameters:
+              macro_f1:
+                componentInputParameter: pipelinechannel--train-model-Output
+              register:
+                componentInputParameter: pipelinechannel--register_model
+              version:
+                componentInputParameter: pipelinechannel--model_version
+          taskInfo:
+            name: publish-model
+    inputDefinitions:
+      artifacts:
+        pipelinechannel--generate-data-dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        pipelinechannel--train-model-model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        pipelinechannel--min_macro_f1:
+          parameterType: NUMBER_DOUBLE
+        pipelinechannel--model_version:
+          parameterType: STRING
+        pipelinechannel--register_model:
+          parameterType: BOOLEAN
+        pipelinechannel--train-model-Output:
+          parameterType: NUMBER_DOUBLE
+  comp-export-onnx-model:
+    executorLabel: exec-export-onnx-model
+    inputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        onnx_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-generate-data:
+    executorLabel: exec-generate-data
+    inputDefinitions:
+      parameters:
+        n_per_class:
+          parameterType: NUMBER_INTEGER
+        seed:
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-publish-model:
+    executorLabel: exec-publish-model
+    inputDefinitions:
+      artifacts:
+        onnx_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        macro_f1:
+          parameterType: NUMBER_DOUBLE
+        register:
+          parameterType: BOOLEAN
+        version:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-train-model:
+    executorLabel: exec-train-model
+    inputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        seed:
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      artifacts:
+        metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        report:
+          artifactType:
+            schemaTitle: system.Markdown
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: NUMBER_DOUBLE
+deploymentSpec:
+  executors:
+    exec-export-onnx-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - export_onnx_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.18.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef export_onnx_model(model: Input[Model], dataset: Input[Dataset],\
+          \ onnx_model: Output[Model]):\n    import pickle\n    import numpy as np\n\
+          \    from bearing.model import export_onnx, verify_onnx\n\n    with open(model.path,\
+          \ \"rb\") as f:\n        clf = pickle.load(f)\n    path = export_onnx(clf,\
+          \ onnx_model.path)\n    diff = verify_onnx(path, clf, np.load(dataset.path)[\"\
+          X\"][:256])\n    onnx_model.metadata.update({\"framework\": \"onnx\", \"\
+          max_diff_vs_sklearn\": diff})\n\n"
+        image: quay.io/YOUR_ORG/mill-bearing-ai:0.1.0
+    exec-generate-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - generate_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.18.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef generate_data(n_per_class: int, seed: int, dataset: Output[Dataset]):\n\
+          \    import numpy as np\n    from bearing.simulate import make_dataset\n\
+          \n    X, y = make_dataset(n_per_class, seed)\n    with open(dataset.path,\
+          \ \"wb\") as f:\n        np.savez(f, X=X, y=y)\n    dataset.metadata.update({\"\
+          rows\": int(len(y)), \"seed\": seed})\n\n"
+        image: quay.io/YOUR_ORG/mill-bearing-ai:0.1.0
+    exec-publish-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - publish_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.18.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef publish_model(onnx_model: Input[Model], version: str, macro_f1:\
+          \ float, register: bool) -> str:\n    from bearing.storage import upload_model\n\
+          \n    uri = upload_model(onnx_model.path, version)\n    print(f\"uploaded\
+          \ model version {version} to {uri}\")\n    if register:\n        from bearing.registry\
+          \ import register as reg\n        reg(uri, version, {\"macro_f1\": macro_f1})\n\
+          \    return uri\n\n"
+        image: quay.io/YOUR_ORG/mill-bearing-ai:0.1.0
+    exec-train-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.18.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_model(dataset: Input[Dataset], seed: int, model: Output[Model],\
+          \ metrics: Output[Metrics],\n                report: Output[Markdown]) ->\
+          \ float:\n    import pickle\n    import numpy as np\n    from bearing.model\
+          \ import train\n\n    d = np.load(dataset.path)\n    clf, m = train(d[\"\
+          X\"], d[\"y\"], seed)\n    with open(model.path, \"wb\") as f:\n       \
+          \ pickle.dump(clf, f)\n    metrics.log_metric(\"macro_f1\", m[\"macro_f1\"\
+          ])\n    for cls, score in m[\"per_class_f1\"].items():\n        metrics.log_metric(f\"\
+          f1_{cls}\", score)\n    with open(report.path, \"w\") as f:\n        f.write(\"\
+          ## Evaluation\\n\\n```\\n\" + m[\"report\"] + \"\\n```\\n\")\n    return\
+          \ float(m[\"macro_f1\"])\n\n"
+        image: quay.io/YOUR_ORG/mill-bearing-ai:0.1.0
+pipelineInfo:
+  description: Train, gate, export and publish the planer bearing fault classifier
+  name: mill-bearing-training
+root:
+  dag:
+    tasks:
+      condition-1:
+        componentRef:
+          name: comp-condition-1
+        dependentTasks:
+        - generate-data
+        - train-model
+        inputs:
+          artifacts:
+            pipelinechannel--generate-data-dataset:
+              taskOutputArtifact:
+                outputArtifactKey: dataset
+                producerTask: generate-data
+            pipelinechannel--train-model-model:
+              taskOutputArtifact:
+                outputArtifactKey: model
+                producerTask: train-model
+          parameters:
+            pipelinechannel--min_macro_f1:
+              componentInputParameter: min_macro_f1
+            pipelinechannel--model_version:
+              componentInputParameter: model_version
+            pipelinechannel--register_model:
+              componentInputParameter: register_model
+            pipelinechannel--train-model-Output:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: train-model
+        taskInfo:
+          name: evaluation-gate
+        triggerPolicy:
+          condition: inputs.parameter_values['pipelinechannel--train-model-Output']
+            >= inputs.parameter_values['pipelinechannel--min_macro_f1']
+      generate-data:
+        cachingOptions: {}
+        componentRef:
+          name: comp-generate-data
+        inputs:
+          parameters:
+            n_per_class:
+              componentInputParameter: n_per_class
+            seed:
+              componentInputParameter: seed
+        taskInfo:
+          name: generate-data
+      train-model:
+        cachingOptions: {}
+        componentRef:
+          name: comp-train-model
+        dependentTasks:
+        - generate-data
+        inputs:
+          artifacts:
+            dataset:
+              taskOutputArtifact:
+                outputArtifactKey: dataset
+                producerTask: generate-data
+          parameters:
+            seed:
+              componentInputParameter: seed
+        taskInfo:
+          name: train-model
+  inputDefinitions:
+    parameters:
+      min_macro_f1:
+        defaultValue: 0.9
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      model_version:
+        defaultValue: '2'
+        isOptional: true
+        parameterType: STRING
+      n_per_class:
+        defaultValue: 600.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      register_model:
+        defaultValue: false
+        isOptional: true
+        parameterType: BOOLEAN
+      seed:
+        defaultValue: 11.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.18.0
+---
+platforms:
+  kubernetes:
+    deploymentSpec:
+      executors:
+        exec-publish-model:
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: AWS_ACCESS_KEY_ID
+              secretKey: AWS_ACCESS_KEY_ID
+            - envVar: AWS_SECRET_ACCESS_KEY
+              secretKey: AWS_SECRET_ACCESS_KEY
+            - envVar: AWS_DEFAULT_REGION
+              secretKey: AWS_DEFAULT_REGION
+            - envVar: AWS_S3_ENDPOINT
+              secretKey: AWS_S3_ENDPOINT
+            - envVar: AWS_S3_BUCKET
+              secretKey: AWS_S3_BUCKET
+            optional: false
+            secretName: aws-connection-my-storage
+            secretNameParameter:
+              runtimeValue:
+                constant: aws-connection-my-storage
