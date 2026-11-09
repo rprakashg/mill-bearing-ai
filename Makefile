@@ -1,4 +1,4 @@
-REGISTRY ?= quay.io/YOUR_ORG
+REGISTRY ?= quay.io/rprakashg
 APP_IMAGE ?= $(REGISTRY)/mill-bearing-ai:0.1.0
 MODEL_IMAGE ?= $(REGISTRY)/bearing-model:1
 PY ?= python3
