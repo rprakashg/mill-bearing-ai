@@ -21,10 +21,10 @@ pipeline:           ## compile the Data Science Pipeline (needs kfp + kfp-kubern
 	PIPELINE_IMAGE=$(APP_IMAGE) $(PY) pipelines/bearing_pipeline.py
 
 image:              ## app image: simulator, scorer and pipeline steps
-	podman build -t $(APP_IMAGE) -t localhost/mill-bearing-ai:latest .
+	podman build -f images/mill-bearing-ai/Containerfile -t $(APP_IMAGE) -t localhost/mill-bearing-ai:latest .
 
 model-image: train  ## "modelcar" image carrying the ONNX model for the edge
-	podman build -f edge/Containerfile.model -t $(MODEL_IMAGE) .
+	podman build -f images/bearing-model/Containerfile -t $(MODEL_IMAGE) .
 
 push: image model-image
 	podman push $(APP_IMAGE) && podman push $(MODEL_IMAGE)

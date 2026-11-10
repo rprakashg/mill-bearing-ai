@@ -1,5 +1,5 @@
 # Mill edge on MicroShift (or any Kubernetes): broker, model server, scorer, simulator.
-# Images: build/push ${APP_IMAGE} from the repo Containerfile and ${MODEL_IMAGE} from edge/Containerfile.model,
+# Images: build/push ${APP_IMAGE} from images/mill-bearing-ai/Containerfile and ${MODEL_IMAGE} from images/bearing-model/Containerfile,
 # then: oc apply -k edge/microshift   (edit the images in kustomization.yaml first)
 apiVersion: v1
 kind: Namespace

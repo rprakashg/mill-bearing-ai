@@ -19,7 +19,7 @@ services:
 
   scorer:
     container_name: mill-edge-scorer
-    build: { context: .., dockerfile: Containerfile }
+    build: { context: .., dockerfile: images/mill-bearing-ai/Containerfile }
     image: localhost/mill-bearing-ai:latest
     command: ["python", "-m", "bearing.edge.scorer"]
     environment:
@@ -30,7 +30,7 @@ services:
     depends_on: [mqtt, ovms]
 
   simulator:
-    build: { context: .., dockerfile: Containerfile }
+    build: { context: .., dockerfile: images/mill-bearing-ai/Containerfile }
     image: localhost/mill-bearing-ai:latest
     command: ["python", "-m", "bearing.edge.simulator"]
     environment:

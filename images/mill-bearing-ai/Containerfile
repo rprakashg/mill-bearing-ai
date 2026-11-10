@@ -1,4 +1,5 @@
 # One image for the edge apps (simulator, scorer) and the pipeline steps.
+# Build from the repo root: podman build -f images/mill-bearing-ai/Containerfile -t mill-bearing-ai .
 FROM registry.access.redhat.com/ubi9/python-311:latest
 
 WORKDIR /opt/app-root/src/mill-bearing-ai

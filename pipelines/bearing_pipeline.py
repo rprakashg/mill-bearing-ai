@@ -3,13 +3,13 @@
 Compile:   pip install "kfp>=2.9" kfp-kubernetes && python pipelines/bearing_pipeline.py
 Then import pipelines/bearing_pipeline.yaml in the OpenShift AI dashboard (Pipelines > Import pipeline).
 
-Every step runs in the project's own image (repo Containerfile), so the pipeline uses exactly the
+Every step runs in the project's own image (images/mill-bearing-ai/Containerfile), so the pipeline uses exactly the
 same simulation, feature and export code as the notebooks and the edge scorer.
 """
 from kfp import compiler, dsl, kubernetes
 from kfp.dsl import Dataset, Input, Markdown, Metrics, Model, Output
 
-# Build and push the repo Containerfile, then set this (or override at compile time with PIPELINE_IMAGE).
+# Build and push images/mill-bearing-ai/Containerfile, then set this (or override at compile time with PIPELINE_IMAGE).
 import os
 IMAGE = os.environ.get("PIPELINE_IMAGE", "quay.io/YOUR_ORG/mill-bearing-ai:0.1.0")
 S3_SECRET = "aws-connection-my-storage"   # the "My Storage" connection
