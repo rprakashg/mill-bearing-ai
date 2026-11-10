@@ -1,0 +1,4 @@
+FROM registry.redhat.com/rhel9/rhel-bootc
+
+
+CMD ["sbin/init"]
