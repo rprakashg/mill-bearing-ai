@@ -62,7 +62,7 @@ spec:
       initContainers:
         # Copy the model out of the signed model image ("modelcar") into a shared volume.
         - name: model
-          image: quay.io/rprakashg/bearing-model
+          image: quay.io/rprakashg/bearing-model:1
           command: ["cp", "-r", "/models/bearing", "/shared/"]
           volumeMounts: [{ name: models, mountPath: /shared }]
       containers:
@@ -102,7 +102,7 @@ spec:
     spec:
       containers:
         - name: scorer
-          image: quay.io/rprakashg/mill-bearing-ai
+          image: quay.io/rprakashg/mill-bearing-ai:0.1.0
           command: ["python", "-m", "bearing.edge.scorer"]
           env:
             - { name: MQTT_HOST, value: mqtt }
@@ -124,7 +124,7 @@ spec:
     spec:
       containers:
         - name: simulator
-          image: quay.io/rprakashg/mill-bearing-ai
+          image: quay.io/rprakashg/mill-bearing-ai:0.1.0
           command: ["python", "-m", "bearing.edge.simulator"]
           env:
             - { name: MQTT_HOST, value: mqtt }
