@@ -20,7 +20,7 @@ services:
   scorer:
     container_name: mill-edge-scorer
     build: { context: .., dockerfile: images/mill-bearing-ai/Containerfile }
-    image: localhost/mill-bearing-ai:latest
+    image: quay.io/rprakashg/mill-bearing-ai
     command: ["python", "-m", "bearing.edge.scorer"]
     environment:
       MQTT_HOST: mqtt
@@ -31,7 +31,7 @@ services:
 
   simulator:
     build: { context: .., dockerfile: images/mill-bearing-ai/Containerfile }
-    image: localhost/mill-bearing-ai:latest
+    image: quay.io/rprakashg/mill-bearing-ai
     command: ["python", "-m", "bearing.edge.simulator"]
     environment:
       MQTT_HOST: mqtt

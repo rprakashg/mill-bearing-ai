@@ -1,0 +1,9 @@
+# Mill edge device: MicroShift + the mill-edge app, auto-applied at boot.
+# Build from the repo root:
+#   podman build --platform=linux/amd64 -f images/edge-device-with-microshift/Containerfile -t quay.io/<you>/mill-edge-microshift-device:0.1.0 .
+FROM registry.redhat.io/openshift4/microshift-bootc-rhel9:v4.22
+
+# Open the API server port for remote oc access (optional)
+RUN firewall-offline-cmd --zone=public --add-port=6443/tcp
+
+RUN bootc container lint

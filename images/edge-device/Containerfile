@@ -1,4 +1,12 @@
-FROM registry.redhat.com/rhel9/rhel-bootc
+# Mill edge device: MicroShift + the mill-edge app, auto-applied at boot.
+# Build from the repo root:
+#   podman build --platform=linux/amd64 -f images/edge-device/Containerfile -t quay.io/<you>/mill-edge-device:0.1.0 .
+FROM registry.redhat.io/rhel9/rhel-bootc:latest
 
-
-CMD ["sbin/init"]
+# podman-compose comes from EPEL; install it, then remove the EPEL repo
+RUN dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
+    dnf -y install podman-compose && \
+    dnf -y remove epel-release && \
+    dnf clean all && rm -rf /var/cache/dnf /var/log/dnf*
+    
+# RUN bootc container lint

@@ -1,0 +1,16 @@
+---
+apiVersion: flightctl.io/v1beta1
+kind: Fleet
+metadata:
+  name: Microshift fleet
+spec:
+  selector:
+    matchLabels:
+      fleet: microshift-fleet
+  template:
+    metadata:
+      labels:
+        fleet: microshift-fleet
+    spec:
+      os: quay.io/rprakashg/mill-edge-microshift-device
+...

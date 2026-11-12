@@ -1,7 +1,7 @@
 # "Modelcar" image: the trained model packaged as a signed, versioned OCI artifact.
 # The edge pulls it like any other image, so the same signing and GitOps flow applies to models.
 # Build from the repo root after `make train`:
-#   podman build -f images/bearing-model/Containerfile -t quay.io/<you>/bearing-model:1 .
+#   podman build --platform=linux/amd64 -f images/bearing-model/Containerfile -t quay.io/rprakashg/bearing-model:1 .
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 COPY models/bearing /models/bearing
 USER 1001
