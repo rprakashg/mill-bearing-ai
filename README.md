@@ -48,6 +48,10 @@ Needs Python 3.9+ and Podman with `podman compose`.
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 make install test          # 6 tests: features, ONNX parity, scorer, KServe v2 client
+make image #builds app image
+make model-image #builds model image 
+make edge-device-image #builds bootc images for provisioning edge devices
+make push # push images to container registry
 make edge-up               # trains the model, then starts MQTT + OVMS + scorer + simulator
 ```
 

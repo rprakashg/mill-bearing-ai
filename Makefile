@@ -47,11 +47,11 @@ push: image model-image
 
 .PHONY: edge-up
 edge-up: train      ## laptop mill edge: MQTT + OVMS + scorer + simulator
-	podman compose -f edge/compose.yaml up --build
+	podman compose -f edge/apps/podman/compose.yaml up
 
 .PHONY: edge-down
 edge-down:
-	podman compose -f edge/compose.yaml down
+	podman compose -f edge/apps/podman/compose.yaml down
 
 .PHONY: fault
 fault:              ## inject bearing wear into the running simulator
