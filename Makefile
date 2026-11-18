@@ -34,19 +34,22 @@ model-image: train  ## "modelcar" image carrying the ONNX model for the edge
 	podman build --platform=linux/amd64 -f images/bearing-model/Containerfile -t $(MODEL_IMAGE) .
 
 .PHONY: edge-device-image
-edge-device-image:
+edge-device-image:  ## bootc device images: podman-compose and MicroShift, both with the Edge Manager agent
 	podman build --platform=linux/amd64 -f images/edge-device/Containerfile -t $(EDGE_DEVICE_IMAGE)	. && \
 	podman build --platform=linux/amd64 -f images/edge-device-with-microshift/Containerfile -t $(EDGE_DEVICE_WITH_MICROSHIFT_IMAGE) .
 
 .PHONY: push	
 push: image model-image
 	podman push $(APP_IMAGE) \
-	&& podman push $(MODEL_IMAGE) \
-	&& podman push $(EDGE_DEVICE_IMAGE) \
+	&& podman push $(MODEL_IMAGE)
+
+.PHONY: push-device-image
+push-device-image: edge-device-image 
+	podman push $(EDGE_DEVICE_IMAGE) \
 	&& podman push $(EDGE_DEVICE_WITH_MICROSHIFT_IMAGE)
 
 .PHONY: edge-up
-edge-up: train      ## laptop mill edge: MQTT + OVMS + scorer + simulator
+edge-up: model-image  ## laptop mill edge: MQTT + OVMS + scorer + simulator
 	podman compose -f edge/apps/podman/compose.yaml up
 
 .PHONY: edge-down

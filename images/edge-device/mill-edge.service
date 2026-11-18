@@ -1,0 +1,18 @@
+# Runs the mill-edge compose app that Red Hat Edge Manager syncs into /etc/mill-edge.
+# Skipped until the agent has delivered the files; the afterUpdating hook starts it then.
+[Unit]
+Description=Mill edge app (broker, model server, scorer, simulator)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/mill-edge/compose.yaml
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/etc/mill-edge
+ExecStart=/usr/bin/podman-compose -f compose.yaml up -d
+ExecStop=/usr/bin/podman-compose -f compose.yaml down
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

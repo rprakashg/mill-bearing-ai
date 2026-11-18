@@ -3,3 +3,6 @@ __pycache__/
 *.egg-info/
 .ipynb_checkpoints/
 .pytest_cache/
+
+# Flight Control enrollment config (credentials), written by `make agent-config`
+images/flightctl/config.yaml

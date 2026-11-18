@@ -1,5 +1,6 @@
-# Mill edge device: MicroShift + the mill-edge app, auto-applied at boot.
-# Build from the repo root:
+# Mill edge device: RHEL bootc + podman-compose + the Red Hat Edge Manager agent.
+# The agent syncs the mill-edge app into /etc/mill-edge, and mill-edge.service runs it.
+# Build from the repo root (make agent-config writes the enrollment config first):
 #   podman build --platform=linux/amd64 -f images/edge-device/Containerfile -t quay.io/<you>/mill-edge-device:0.1.0 .
 FROM registry.redhat.io/rhel9/rhel-bootc:latest
 
@@ -8,5 +9,18 @@ RUN dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.n
     dnf -y install podman-compose && \
     dnf -y remove epel-release && \
     dnf clean all && rm -rf /var/cache/dnf /var/log/dnf*
-    
+
+# Flight Control agent from the upstream COPR. With a Red Hat Edge Manager subscription, use
+# `subscription-manager repos --enable rhem-1-for-rhel-9-$(uname -m)-rpms` instead.
+RUN curl -fsSL -o /etc/yum.repos.d/flightctl.repo \
+      https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl/repo/rhel-9/group_redhat-et-flightctl-rhel-9.repo && \
+    dnf -y install flightctl-agent && \
+    dnf clean all && rm -rf /var/cache/dnf /var/log/dnf*
+
+# The mill-edge app, restarted by the agent whenever its files change
+COPY images/edge-device/mill-edge.service /usr/lib/systemd/system/mill-edge.service
+COPY images/edge-device/mill-edge-hook.yaml /etc/flightctl/hooks.d/afterupdating/90-mill-edge.yaml
+RUN systemctl enable mill-edge.service
+
 # RUN bootc container lint
+RUN bootc container lint

@@ -1,5 +1,9 @@
-# Laptop "mill edge": podman compose -f edge/compose.yaml up --build   (run from the repo root, after `make train`)
+# Mill edge on Podman: the laptop (`make edge-up`, run from the repo root) and RHEL bootc devices
+# run this same file. On devices, Red Hat Edge Manager syncs this directory to /etc/mill-edge
+# and mill-edge.service runs it.
 # Same model, same OVMS server, same KServe v2 API as the OpenShift AI deployment.
+# The model comes from the model image ("modelcar"): `make model-image` builds it locally,
+# and rolling out a new model = bump the bearing-model tag here and push.
 name: mill-edge
 
 services:
@@ -8,6 +12,16 @@ services:
     ports: ["1883:1883"]
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro,Z
+    restart: on-failure
+
+  # Copy the model out of the model image into a shared volume.
+  # Root, because a new named volume is root-owned and the image runs as 1001.
+  model:
+    image: quay.io/rprakashg/bearing-model:1
+    user: root
+    command: ["cp", "-r", "/models/bearing", "/shared/"]
+    volumes:
+      - models:/shared
 
   ovms:
     container_name: mill-edge-ovms
@@ -15,7 +29,10 @@ services:
     command: ["--model_name", "bearing", "--model_path", "/models/bearing", "--port", "9000", "--rest_port", "8000"]
     ports: ["8000:8000"]
     volumes:
-      - ../models:/models:ro,Z
+      - models:/models:ro
+    depends_on:
+      model: { condition: service_completed_successfully }
+    restart: on-failure
 
   scorer:
     container_name: mill-edge-scorer
@@ -27,6 +44,7 @@ services:
       ALERT_THRESHOLD: "0.7"
       ALERT_CONSECUTIVE: "3"
     depends_on: [mqtt, ovms]
+    restart: on-failure
 
   simulator:
     image: quay.io/rprakashg/mill-bearing-ai:0.1.0
@@ -35,3 +53,7 @@ services:
       MQTT_HOST: mqtt
       ASSET_ID: planer-3
     depends_on: [mqtt, scorer]
+    restart: on-failure
+
+volumes:
+  models: {}

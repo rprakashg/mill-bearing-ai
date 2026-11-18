@@ -1,8 +1,22 @@
+# Red Hat Edge Manager (Flight Control) fleet for mills running MicroShift.
+# Devices boot the MicroShift bootc image, and the agent syncs the mill-edge kustomization
+# from Git into /etc/microshift/manifests.d/. The agent's built-in afterUpdating hook runs
+# `kubectl apply -k` when files there change, so a Git push rolls out to every mill.
+#   flightctl apply -f edge/fleets/microshift-fleet.yaml
+#   flightctl approve enrollmentrequest/<id> -l fleet=microshift-fleet
+---
+apiVersion: flightctl.io/v1beta1
+kind: Repository
+metadata:
+  name: mill-bearing-ai
+spec:
+  type: git
+  url: https://github.com/rprakashg/mill-bearing-ai.git
 ---
 apiVersion: flightctl.io/v1beta1
 kind: Fleet
 metadata:
-  name: Microshift fleet
+  name: microshift-fleet
 spec:
   selector:
     matchLabels:
@@ -12,5 +26,18 @@ spec:
       labels:
         fleet: microshift-fleet
     spec:
-      os: quay.io/rprakashg/mill-edge-microshift-device
-...
+      os:
+        image: quay.io/rprakashg/mill-edge-microshift-device:0.1.0
+      config:
+        # The mill-edge app: broker, model server, scorer and simulator.
+        # Rolling out a new model = bump the model image tag in edge/apps/microshift and push.
+        - name: mill-edge-ai-app
+          gitRef:
+            repository: mill-bearing-ai
+            targetRevision: main
+            path: /edge/apps/microshift
+            mountPath: /etc/microshift/manifests.d/mill-edge
+      systemd:
+        # Report MicroShift health in the device status.
+        matchPatterns:
+          - microshift.service

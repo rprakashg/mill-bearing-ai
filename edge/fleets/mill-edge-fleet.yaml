@@ -1,0 +1,43 @@
+# Red Hat Edge Manager (Flight Control) fleet for mills running the Podman compose app.
+# Devices boot the RHEL bootc image, and the agent syncs edge/apps/podman from Git into
+# /etc/mill-edge. mill-edge.service (baked into the image) runs compose.yaml, and an
+# afterUpdating hook in the image restarts it when those files change, so a Git push rolls
+# out to every mill.
+#   flightctl apply -f edge/fleets/mill-edge-fleet.yaml
+#   flightctl approve enrollmentrequest/<id> -l fleet=mill-edge-fleet
+---
+apiVersion: flightctl.io/v1beta1
+kind: Repository
+metadata:
+  name: mill-bearing-ai
+spec:
+  type: git
+  url: https://github.com/rprakashg/mill-bearing-ai.git
+---
+apiVersion: flightctl.io/v1beta1
+kind: Fleet
+metadata:
+  name: mill-edge-fleet
+spec:
+  selector:
+    matchLabels:
+      fleet: mill-edge-fleet
+  template:
+    metadata:
+      labels:
+        fleet: mill-edge-fleet
+    spec:
+      os:
+        image: quay.io/rprakashg/mill-edge-device:0.1.0
+      config:
+        # The mill-edge app: broker, model server, scorer and simulator.
+        - name: mill-edge-app
+          gitRef:
+            repository: mill-bearing-ai
+            targetRevision: main
+            path: /edge/apps/podman
+            mountPath: /etc/mill-edge
+      systemd:
+        # Report the app's health in the device status.
+        matchPatterns:
+          - mill-edge.service

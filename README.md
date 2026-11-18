@@ -52,7 +52,7 @@ make image #builds app image
 make model-image #builds model image 
 make edge-device-image #builds bootc images for provisioning edge devices
 make push # push images to container registry
-make edge-up               # trains the model, then starts MQTT + OVMS + scorer + simulator
+make edge-up               # trains the model, builds the model image, then starts MQTT + OVMS + scorer + simulator
 ```
 
 In a second terminal:

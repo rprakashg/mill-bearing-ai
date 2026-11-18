@@ -1,0 +1,5 @@
+# Flight Control afterUpdating hook: restart the app when the agent changes its files.
+- if:
+    - path: /etc/mill-edge/
+      op: [created, updated, removed]
+  run: systemctl restart mill-edge.service
