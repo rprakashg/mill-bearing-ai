@@ -76,7 +76,15 @@ Works on the free [Developer Sandbox](https://developers.redhat.com/developer-sa
 6. **Export and upload:** run `notebooks/2_export_upload_register.ipynb`. It writes `models/bearing/1/model.onnx` to the bucket. To register in the Model Registry, set `MODEL_REGISTRY_URL` (and `pip install model-registry`) first.
 7. **Serve:** *Models > Deploy model* with the **OpenVINO Model Server** runtime, framework `onnx - 1`, connection **My Storage**, path `models/bearing/`. Name it `bearing`. Or use `oc apply -f openshift-ai/10-serving.yaml`.
 8. **Test:** set `MODEL_URL` to the inference endpoint (and `MODEL_TOKEN` if token auth is on), then run `notebooks/3_test_endpoint.ipynb`.
-9. **Automate:** build and push the app image (`make image push REGISTRY=quay.io/you`), compile with `make pipeline REGISTRY=quay.io/you`, and import `pipelines/bearing_pipeline.yaml` under *Pipelines > Import pipeline*. A run generates data, trains, **stops if macro F1 is under 0.90**, exports ONNX, and publishes version 2. Restart the model deployment to load it.
+9. **Automate:** build and push the app image (`make image push REGISTRY=quay.io/you`), compile with `make pipeline REGISTRY=quay.io/you`, and import `pipelines/bearing_pipeline.yaml` under *Pipelines > Import pipeline*. A run generates data, trains, **stops if macro F1 is under 0.90**, exports ONNX, and publishes version 2. Restart the model deployment to load it. The same run also pushes the model image `quay.io/you/bearing-model:2` for the edge and signs it with Sigstore (cosign). It needs two secrets in the project first:
+
+   ```bash
+   oc create secret generic modelcar-registry --type=kubernetes.io/dockerconfigjson \
+       --from-file=.dockerconfigjson=$HOME/.config/containers/auth.json   # push access to quay.io/you/bearing-model
+   cosign generate-key-pair k8s://<your-data-science-project>/cosign-signing-key
+   ```
+
+   The signature is recorded in the public Rekor transparency log; set the `transparency_log` run parameter to `false` to skip it, for example in a disconnected environment.
 
 ## Path C: the mill edge on MicroShift
 

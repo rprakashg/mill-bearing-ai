@@ -23,7 +23,7 @@ notebooks:          ## regenerate the workbench notebooks from notebooks/_build_
 
 .PHONY: pipeline
 pipeline:           ## compile the Data Science Pipeline (needs kfp + kfp-kubernetes)
-	PIPELINE_IMAGE=$(APP_IMAGE) $(PY) pipelines/bearing_pipeline.py
+	PIPELINE_IMAGE=$(APP_IMAGE) MODELCAR_REPO=$(REGISTRY)/bearing-model $(PY) pipelines/bearing_pipeline.py
 
 .PHONY: image
 image:              ## app image: simulator, scorer and pipeline steps

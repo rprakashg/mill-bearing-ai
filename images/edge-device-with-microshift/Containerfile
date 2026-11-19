@@ -1,19 +1,18 @@
-# Mill edge device: MicroShift + the Red Hat Edge Manager agent.
+# Mill edge device: MicroShift + the Flight Control agent.
 # The agent syncs the mill-edge manifests into /etc/microshift/manifests.d/ and applies them.
-# Build from the repo root (make agent-config writes the enrollment config first):
+# Build from the repo root:
 #   podman build --platform=linux/amd64 -f images/edge-device-with-microshift/Containerfile -t quay.io/<you>/mill-edge-microshift-device:0.1.0 .
 FROM registry.redhat.io/openshift4/microshift-bootc-rhel9:v4.22
 
 # Open the API server port for remote oc access (optional)
 RUN firewall-offline-cmd --zone=public --add-port=6443/tcp
 
-# Flight Control agent from the upstream COPR. With a Red Hat Edge Manager subscription, use
-# `subscription-manager repos --enable rhem-1-for-rhel-9-$(uname -m)-rpms` instead.
+# Flight Control agent and CLI from the upstream COPR. The package also masks bootc's own
+# update timer, since the agent manages OS updates.
 RUN curl -fsSL -o /etc/yum.repos.d/flightctl.repo \
       https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl/repo/rhel-9/group_redhat-et-flightctl-rhel-9.repo && \
-    dnf -y install flightctl-agent && \
+    dnf -y install flightctl-agent flightctl-cli && \
     dnf clean all && rm -rf /var/cache/dnf /var/log/dnf* && \
     systemctl enable flightctl-agent.service
-COPY images/flightctl/config.yaml /etc/flightctl/config.yaml
 
 RUN bootc container lint

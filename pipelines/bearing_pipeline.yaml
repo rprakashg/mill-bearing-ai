@@ -4,13 +4,57 @@
 # Inputs:
 #    min_macro_f1: float [Default: 0.9]
 #    model_version: str [Default: '2']
+#    modelcar_repository: str [Default: 'quay.io/rprakashg/bearing-model']
 #    n_per_class: int [Default: 600.0]
 #    register_model: bool [Default: False]
 #    seed: int [Default: 11.0]
+#    transparency_log: bool [Default: True]
 components:
+  comp-build-modelcar:
+    executorLabel: exec-build-modelcar
+    inputDefinitions:
+      artifacts:
+        onnx_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        base_image:
+          parameterType: STRING
+        repository:
+          parameterType: STRING
+        version:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        image:
+          parameterType: STRING
   comp-condition-1:
     dag:
       tasks:
+        build-modelcar:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-build-modelcar
+          dependentTasks:
+          - export-onnx-model
+          inputs:
+            artifacts:
+              onnx_model:
+                taskOutputArtifact:
+                  outputArtifactKey: onnx_model
+                  producerTask: export-onnx-model
+            parameters:
+              base_image:
+                runtimeValue:
+                  constant: registry.access.redhat.com/ubi9/ubi-minimal:latest
+              repository:
+                componentInputParameter: pipelinechannel--modelcar_repository
+              version:
+                componentInputParameter: pipelinechannel--model_version
+          taskInfo:
+            name: build-modelcar
         export-onnx-model:
           cachingOptions:
             enableCache: true
@@ -46,6 +90,27 @@ components:
                 componentInputParameter: pipelinechannel--model_version
           taskInfo:
             name: publish-model
+        sign-modelcar:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-sign-modelcar
+          dependentTasks:
+          - build-modelcar
+          inputs:
+            parameters:
+              image:
+                taskOutputParameter:
+                  outputParameterKey: image
+                  producerTask: build-modelcar
+              macro_f1:
+                componentInputParameter: pipelinechannel--train-model-Output
+              tlog_upload:
+                componentInputParameter: pipelinechannel--transparency_log
+              version:
+                componentInputParameter: pipelinechannel--model_version
+          taskInfo:
+            name: sign-modelcar
     inputDefinitions:
       artifacts:
         pipelinechannel--generate-data-dataset:
@@ -61,10 +126,14 @@ components:
           parameterType: NUMBER_DOUBLE
         pipelinechannel--model_version:
           parameterType: STRING
+        pipelinechannel--modelcar_repository:
+          parameterType: STRING
         pipelinechannel--register_model:
           parameterType: BOOLEAN
         pipelinechannel--train-model-Output:
           parameterType: NUMBER_DOUBLE
+        pipelinechannel--transparency_log:
+          parameterType: BOOLEAN
   comp-export-onnx-model:
     executorLabel: exec-export-onnx-model
     inputDefinitions:
@@ -116,6 +185,18 @@ components:
       parameters:
         Output:
           parameterType: STRING
+  comp-sign-modelcar:
+    executorLabel: exec-sign-modelcar
+    inputDefinitions:
+      parameters:
+        image:
+          parameterType: STRING
+        macro_f1:
+          parameterType: NUMBER_DOUBLE
+        tlog_upload:
+          parameterType: BOOLEAN
+        version:
+          parameterType: STRING
   comp-train-model:
     executorLabel: exec-train-model
     inputDefinitions:
@@ -146,6 +227,42 @@ components:
           parameterType: NUMBER_DOUBLE
 deploymentSpec:
   executors:
+    exec-build-modelcar:
+      container:
+        args:
+        - '{{$.inputs.artifacts[''onnx_model''].path}}'
+        - '{{$.inputs.parameters[''repository'']}}'
+        - '{{$.inputs.parameters[''version'']}}'
+        - '{{$.inputs.parameters[''base_image'']}}'
+        - '{{$.outputs.parameters[''image''].output_file}}'
+        command:
+        - /busybox/sh
+        - -ec
+        - '
+
+          mkdir -p /tmp/docker "/tmp/layer/models/bearing/$3" "$(dirname "$5")"
+
+          cp /secrets/registry/.dockerconfigjson /tmp/docker/config.json
+
+          export DOCKER_CONFIG=/tmp/docker
+
+          cp "$1" "/tmp/layer/models/bearing/$3/model.onnx"
+
+          chmod -R a+rX /tmp/layer
+
+          tar -C /tmp/layer -cf /tmp/model-layer.tar models
+
+          crane mutate --platform linux/amd64 "$4" --append /tmp/model-layer.tar -t
+          "$2:$3" --user 1001     -l org.opencontainers.image.title=bearing-model
+          -l org.opencontainers.image.version="$3"
+
+          printf ''%s@%s'' "$2" "$(crane digest "$2:$3")" > "$5"
+
+          echo "pushed $(cat "$5")"
+
+          '
+        - build-modelcar
+        image: gcr.io/go-containerregistry/crane/debug:v0.21.5
     exec-export-onnx-model:
       container:
         args:
@@ -179,7 +296,7 @@ deploymentSpec:
           \ onnx_model.path)\n    diff = verify_onnx(path, clf, np.load(dataset.path)[\"\
           X\"][:256])\n    onnx_model.metadata.update({\"framework\": \"onnx\", \"\
           max_diff_vs_sklearn\": diff})\n\n"
-        image: quay.io/YOUR_ORG/mill-bearing-ai:0.1.0
+        image: quay.io/rprakashg/mill-bearing-ai:0.1.0
     exec-generate-data:
       container:
         args:
@@ -211,7 +328,7 @@ deploymentSpec:
           \n    X, y = make_dataset(n_per_class, seed)\n    with open(dataset.path,\
           \ \"wb\") as f:\n        np.savez(f, X=X, y=y)\n    dataset.metadata.update({\"\
           rows\": int(len(y)), \"seed\": seed})\n\n"
-        image: quay.io/YOUR_ORG/mill-bearing-ai:0.1.0
+        image: quay.io/rprakashg/mill-bearing-ai:0.1.0
     exec-publish-model:
       container:
         args:
@@ -244,7 +361,38 @@ deploymentSpec:
           \ model version {version} to {uri}\")\n    if register:\n        from bearing.registry\
           \ import register as reg\n        reg(uri, version, {\"macro_f1\": macro_f1})\n\
           \    return uri\n\n"
-        image: quay.io/YOUR_ORG/mill-bearing-ai:0.1.0
+        image: quay.io/rprakashg/mill-bearing-ai:0.1.0
+    exec-sign-modelcar:
+      container:
+        args:
+        - '{{$.inputs.parameters[''image'']}}'
+        - '{{$.inputs.parameters[''version'']}}'
+        - '{{$.inputs.parameters[''macro_f1'']}}'
+        - '{{$.inputs.parameters[''tlog_upload'']}}'
+        command:
+        - /busybox/sh
+        - -ec
+        - '
+
+          mkdir -p /tmp/docker
+
+          cp /secrets/registry/.dockerconfigjson /tmp/docker/config.json
+
+          export DOCKER_CONFIG=/tmp/docker
+
+          case "$4" in true|True) skip_tlog=false ;; *) skip_tlog=true ;; esac
+
+          cosign sign --yes --key /secrets/cosign/cosign.key --tlog-upload="$4"     -a
+          model_version="$2" -a macro_f1="$3" "$1"
+
+          cosign verify --key /secrets/cosign/cosign.pub --insecure-ignore-tlog="$skip_tlog"
+          "$1" > /dev/null
+
+          echo "signed and verified $1"
+
+          '
+        - sign-modelcar
+        image: ghcr.io/sigstore/cosign/cosign:v2.5.0-dev
     exec-train-model:
       container:
         args:
@@ -281,7 +429,7 @@ deploymentSpec:
           f1_{cls}\", score)\n    with open(report.path, \"w\") as f:\n        f.write(\"\
           ## Evaluation\\n\\n```\\n\" + m[\"report\"] + \"\\n```\\n\")\n    return\
           \ float(m[\"macro_f1\"])\n\n"
-        image: quay.io/YOUR_ORG/mill-bearing-ai:0.1.0
+        image: quay.io/rprakashg/mill-bearing-ai:0.1.0
 pipelineInfo:
   description: Train, gate, export and publish the planer bearing fault classifier
   name: mill-bearing-training
@@ -309,12 +457,16 @@ root:
               componentInputParameter: min_macro_f1
             pipelinechannel--model_version:
               componentInputParameter: model_version
+            pipelinechannel--modelcar_repository:
+              componentInputParameter: modelcar_repository
             pipelinechannel--register_model:
               componentInputParameter: register_model
             pipelinechannel--train-model-Output:
               taskOutputParameter:
                 outputParameterKey: Output
                 producerTask: train-model
+            pipelinechannel--transparency_log:
+              componentInputParameter: transparency_log
         taskInfo:
           name: evaluation-gate
         triggerPolicy:
@@ -359,6 +511,10 @@ root:
         defaultValue: '2'
         isOptional: true
         parameterType: STRING
+      modelcar_repository:
+        defaultValue: quay.io/rprakashg/bearing-model
+        isOptional: true
+        parameterType: STRING
       n_per_class:
         defaultValue: 600.0
         isOptional: true
@@ -371,6 +527,10 @@ root:
         defaultValue: 11.0
         isOptional: true
         parameterType: NUMBER_INTEGER
+      transparency_log:
+        defaultValue: true
+        isOptional: true
+        parameterType: BOOLEAN
 schemaVersion: 2.1.0
 sdkVersion: kfp-2.18.0
 ---
@@ -378,6 +538,14 @@ platforms:
   kubernetes:
     deploymentSpec:
       executors:
+        exec-build-modelcar:
+          secretAsVolume:
+          - mountPath: /secrets/registry
+            optional: false
+            secretName: modelcar-registry
+            secretNameParameter:
+              runtimeValue:
+                constant: modelcar-registry
         exec-publish-model:
           secretAsEnv:
           - keyToEnv:
@@ -396,3 +564,26 @@ platforms:
             secretNameParameter:
               runtimeValue:
                 constant: aws-connection-my-storage
+        exec-sign-modelcar:
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: COSIGN_PASSWORD
+              secretKey: cosign.password
+            optional: false
+            secretName: cosign-signing-key
+            secretNameParameter:
+              runtimeValue:
+                constant: cosign-signing-key
+          secretAsVolume:
+          - mountPath: /secrets/registry
+            optional: false
+            secretName: modelcar-registry
+            secretNameParameter:
+              runtimeValue:
+                constant: modelcar-registry
+          - mountPath: /secrets/cosign
+            optional: false
+            secretName: cosign-signing-key
+            secretNameParameter:
+              runtimeValue:
+                constant: cosign-signing-key
